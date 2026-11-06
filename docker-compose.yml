@@ -1,0 +1,34 @@
+services:
+  app:
+    build: .
+    image: glassbox:latest
+    volumes:
+      - ${GLASSBOX_DIR:-${BLACKBOX_DIR:-./glassbox_store}}:/glassbox
+      - ./weights:/weights:ro
+      - ./manifests:/app/manifests
+    shm_size: 1g
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - GLASSBOX_DIR=/glassbox
+      - BLACKBOX_DIR=/glassbox
+      - GLASSBOX_GPU=cuda
+    command: ["--help"]
+
+  sidecar:
+    build: .
+    image: glassbox:latest
+    volumes:
+      - ${GLASSBOX_DIR:-${BLACKBOX_DIR:-./glassbox_store}}:/glassbox
+      - ./manifests:/app/manifests
+    shm_size: 1g
+    environment:
+      - GLASSBOX_DIR=/glassbox
+      - BLACKBOX_DIR=/glassbox
+      - GLASSBOX_ROLE=sidecar
+    command: ["run", "--help"]

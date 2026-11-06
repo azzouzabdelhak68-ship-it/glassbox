@@ -1,0 +1,50 @@
+[project]
+name = "glassbox"
+version = "0.1.0"
+description = "GlassBox: Flight recorder & mechanistic interpretability instrumentation engine for PyTorch LLMs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+  "torch>=2.4",
+  "safetensors>=0.4",
+  "pyyaml>=6.0",
+  "numpy>=1.26",
+]
+authors = [{ name = "GlassBox contributors" }]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.4", "mypy>=1.10", "pytest>=8.0"]
+search = ["pyarrow>=15", "duckdb>=1.0"]
+
+[project.scripts]
+glassbox = "glassbox.cli:main"
+blackbox = "glassbox.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["glassbox*", "blackbox*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+# NOTE: target is 3.12 (not the 3.10 runtime floor) because numpy>=2 ships
+# PEP 695 stubs that mypy cannot parse at python_version 3.10. Runtime 3.10
+# compat is still guarded by ruff target-version py310 (UP rules flag newer
+# syntax). CI (ubuntu 3.11) is authoritative for the 3.10-3.12 range.
+python_version = "3.12"
+ignore_missing_imports = true
+show_error_codes = true
+
+[tool.pytest.ini_options]
+markers = ["gpu: marks tests requiring Linux+NVIDIA GPU (deselect by default)"]
+
+[dependency-groups]

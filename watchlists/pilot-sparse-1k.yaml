@@ -1,0 +1,10 @@
+version: 1
+model_id: M-001
+checkpoint_sha256: ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34ab12cd34
+watchlist_id: pilot-sparse-1k-v1
+trigger: always
+window: { start_token: 0, end_token: 511, every_n: 1 }
+precision: fp16
+entries:
+  - preset: pilot-sparse-1k
+  - addresses: [A-02-04, N-02-0001]

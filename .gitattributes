@@ -1,0 +1,4 @@
+# Normalize line endings cross-platform (Windows/Mac/Linux contributors).
+* text=auto
+# Sealed binaries stay byte-exact.
+*.bin binary

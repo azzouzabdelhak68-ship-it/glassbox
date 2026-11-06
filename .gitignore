@@ -1,0 +1,33 @@
+# GlassBox runtime outputs (user-owned, never commit)
+manifests/*
+!manifests/.gitkeep
+glassbox_store/*
+!glassbox_store/.gitkeep
+blackbox_store/*
+!blackbox_store/.gitkeep
+*.bin
+
+# Viewer exports
+*.html
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.egg-info/
+
+# Env / secrets (never commit)
+.env
+.env.*
+*.pem
+*.key
+
+# Tooling
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+htmlcov/
+.coverage

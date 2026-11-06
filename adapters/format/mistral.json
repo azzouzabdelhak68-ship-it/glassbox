@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "adapters/format/mistral.json",
+  "description": "Layout descriptor for the Mistral family (see docs/FORMAT_GUIDE.md). Same container, different inventory.",
+  "family": "mistral",
+  "layout": "row_major_float16",
+  "order": "row_major_token_major",
+  "endian": "little",
+  "dtypes": ["fp32", "fp16", "bf16"],
+  "addressing": {
+    "layer": "L-{LL:02d}",
+    "attention_head": "A-{LL:02d}-{HH:02d}",
+    "mlp_neuron": "N-{LL:02d}-{NNNN:04d}",
+    "specials": ["EMBED", "LOGITS", "NORM"]
+  },
+  "reference_arch": {
+    "layers": 32,
+    "hidden": 4096,
+    "heads": 32,
+    "mlp_per_layer": 14336,
+    "vocab": 32000
+  },
+  "notes": "Sliding-window attention does not change the address scheme; heads and MLP neurons address identically to Llama-3."
+}
