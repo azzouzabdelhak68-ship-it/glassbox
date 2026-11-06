@@ -12,7 +12,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![PyTorch 2.4+](https://img.shields.io/badge/pytorch-2.4%2B-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Ruff: Compliant](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type Checked: Mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
 [![Status: v0.1.0](https://img.shields.io/badge/release-v0.1.0-brightgreen.svg)]()
@@ -400,4 +400,4 @@ ruff format --check .
 
 ## License
 
-GlassBox is open-source software licensed under the [MIT License](LICENSE).
+GlassBox is open-source software licensed under the [Apache License, Version 2.0](LICENSE).

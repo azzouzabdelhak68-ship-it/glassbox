@@ -4,14 +4,14 @@ version = "0.1.0"
 description = "GlassBox: Flight recorder & mechanistic interpretability instrumentation engine for PyTorch LLMs"
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 dependencies = [
   "torch>=2.4",
   "safetensors>=0.4",
   "pyyaml>=6.0",
   "numpy>=1.26",
 ]
-authors = [{ name = "GlassBox contributors" }]
+authors = [{ name = "Abdelhak Azzouz and GlassBox contributors" }]
 
 [project.optional-dependencies]
 dev = ["ruff>=0.4", "mypy>=1.10", "pytest>=8.0"]
