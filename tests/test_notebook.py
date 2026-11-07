@@ -45,6 +45,11 @@ def test_quickstart_demo_notebook_validity() -> None:
     assert "format_lens_table" in all_source or "lens" in all_source
     assert "render_html" in all_source
     assert "IPython" in all_source
+    assert "Qwen/Qwen2.5-3B" in all_source
+    assert "Test C" in all_source
+    assert "scaling_results" in all_source
+    assert "t4_scaling_matrix.csv" in all_source
+    assert "t4_scaling_matrix.json" in all_source
 
     # Validate Python syntax of all code cells
     for i, cell in enumerate(code_cells):
