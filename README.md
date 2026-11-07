@@ -16,19 +16,28 @@
 [![Ruff: Compliant](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type Checked: Mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
 [![Status: v0.1.0](https://img.shields.io/badge/release-v0.1.0-brightgreen.svg)]()
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/azzouzabdelhak68-ship-it/glassbox/blob/main/notebooks/quickstart_demo.ipynb)
 
 <p align="center">
   <b>GlassBox makes LLM internals clear as glass.</b><br>
   Don't just observe what a model outputs — record tamper-evident mathematical evidence to reconstruct internal neuron firings, attention dynamics, residual stream progressions, and causal decision pathways token-by-token.
 </p>
 
-[Key Features](#key-features) •
+<p align="center">
+  <a href="https://colab.research.google.com/github/azzouzabdelhak68-ship-it/glassbox/blob/main/notebooks/quickstart_demo.ipynb">
+    <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab">
+  </a>
+</p>
+
+[Try in Colab](#-try-it-in-colab-zero-setup) •
 [Why GlassBox?](#why-glassbox) •
+[Key Features](#key-features) •
 [Architecture](#architecture) •
 [Quickstart](#quickstart) •
 [Superpowers](#mechanistic-superpowers) •
 [CLI Reference](#cli-reference) •
-[Watchlist DSL](#addressing-scheme--watchlist-dsl)
+[Watchlist DSL](#addressing-scheme--watchlist-dsl) •
+[License](LICENSE)
 
 ---
 
@@ -110,6 +119,21 @@ flowchart TD
 
 ---
 
+## ⚡ Try It in Colab (Zero Setup)
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/azzouzabdelhak68-ship-it/glassbox/blob/main/notebooks/quickstart_demo.ipynb)
+
+Don't want to install anything locally or mess with environments? You can test GlassBox right now in your browser:
+
+- **Runs in 60 seconds:** Automatically installs and loads a lightweight open model (`Qwen2.5-0.5B`) on Colab's free CPU or GPU.
+- **Live speed test:** Compares raw PyTorch vs. standard hooks vs. GlassBox so you can see the **<1% overhead** for yourself.
+- **Inspect what the model thinks:** See layer-by-layer token predictions (Logit Lens) and which neurons fire on your prompt.
+- **Visual report:** Opens the interactive HTML viewer right inside the notebook.
+
+Just click the badge above, hit **Run all**, and see it work.
+
+---
+
 ## Installation
 
 ```bash
@@ -117,7 +141,7 @@ flowchart TD
 pip install glassbox
 
 # Or install from source
-git clone https://github.com/<your-username>/glassbox.git
+git clone https://github.com/azzouzabdelhak68-ship-it/glassbox.git
 cd glassbox
 pip install -e ".[dev,search]"
 ```
@@ -127,6 +151,10 @@ pip install -e ".[dev,search]"
 ---
 
 ## Quickstart
+
+> 🚀 **1-Click Live Demo in Google Colab (Free GPU / CPU):**  
+> [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/azzouzabdelhak68-ship-it/glassbox/blob/main/notebooks/quickstart_demo.ipynb)  
+> *See [COLAB.md](COLAB.md) for full guide: benchmark <1% overhead live, trace intermediate neurons on Qwen2.5-0.5B, view the Logit Lens, and render the interactive Calm Viewer directly in your browser.*
 
 ### 1. Scan Model Weights (CPU, 2–10 seconds, once per checkpoint)
 
