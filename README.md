@@ -127,9 +127,11 @@ flowchart TD
 Don't want to install anything locally or mess with environments? You can test GlassBox right now in your browser:
 
 - **Runs in 60 seconds:** Automatically installs and loads a lightweight open model (`Qwen2.5-0.5B`) on Colab's free CPU or GPU.
-- **Live speed test:** Compares raw PyTorch vs. standard hooks vs. GlassBox so you can see the **<1% overhead** for yourself.
+- **Dual speed benchmarks:** Runs both an interactive micro-test ($B=1$) and a production stress test ($B=4$, multi-layer payload) to demonstrate where synchronous `.cpu()` stalls and how GlassBox maintains **<1% overhead**.
 - **Inspect what the model thinks:** See layer-by-layer token predictions (Logit Lens) and which neurons fire on your prompt.
 - **Visual report:** Opens the interactive HTML viewer right inside the notebook.
+
+> 💡 **Why Scale Matters:** At micro-scale (0.5B at batch=1), GPU forward passes take `<3ms`, so Python hook dispatch dominates. GlassBox's sub-1% asynchronous DMA advantage shines at production scale ($B \ge 4$ or models $\ge 7\text{B}$) where activation payloads are tens of megabytes and synchronous `.cpu()` stalls the CUDA pipeline.
 
 Just click the badge above, hit **Run all**, and see it work.
 
