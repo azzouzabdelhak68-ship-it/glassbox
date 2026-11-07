@@ -39,3 +39,11 @@ When you click the badge above and hit **Run all**, it runs the whole pipeline i
 3. Scroll through the live benchmark, Logit Lens table, and interactive visualizer.
 
 No cloning, no setup. Try it out and see how it performs!
+
+---
+
+## Need Heavy-Duty A100 (40 GB) Research Runs?
+
+For large-model mechanistic interpretability (`Qwen/Qwen3-14B` in native BF16 ~30 GB VRAM or `Qwen3-32B` 4-bit NF4 across a 4-module Safety & Steering circuit battery, token-by-token streaming straight to Google Drive in ~3–5 minutes under a `< 20 min` wall-clock cap), see **[A100_STRETCH_NOTE.md](A100_STRETCH_NOTE.md)** or launch directly:
+
+[![Open A100 Stretch Test In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/azzouzabdelhak68-ship-it/glassbox/blob/main/notebooks/a100_stretch_test.ipynb)

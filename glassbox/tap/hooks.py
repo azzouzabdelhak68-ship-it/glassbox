@@ -221,6 +221,10 @@ class DeepTap:
         self.sidecar: Any = sidecar
         self.batch_index: int = int(batch_index)
         self.groups: dict[str, list[tuple[str, int, int]]] = group_by_parent(self.watched)
+        self._group_col_np: dict[str, np.ndarray] = {
+            parent: np.asarray([col for _, _, col in cols], dtype=np.intp)
+            for parent, cols in self.groups.items()
+        }
         self.pinned: dict[str, list[_HostSlot]] = {
             parent: [_HostSlot(len(cols)), _HostSlot(len(cols))]
             for parent, cols in self.groups.items()
@@ -228,7 +232,7 @@ class DeepTap:
         self._flip: dict[str, int] = {parent: 0 for parent in self.groups}
         self.events: dict[str, Any] = {parent: None for parent in self.groups}
         self._staging: dict[int, float] = {}
-        self._staging_seq: dict[str, np.ndarray] = {}
+        self._staging_seq: dict[str, Any] = {}
         self.ring: list[list[float]] = []
         self.token_positions: list[int] = []
         self._raw_logits_summary: list[tuple[Any, Any, Any]] = []
@@ -245,6 +249,7 @@ class DeepTap:
             "source": "ieee_bfloat16_le" if dtype == "bf16" else "logical_values",
         }
         self._handles: list[Any] = []
+        self._parent_heads: dict[str, int] = {}
         self._detached: bool = False
 
     @property
@@ -322,6 +327,9 @@ class DeepTap:
             sub = m_layer.group(2)
             layer_prefixes = (
                 f"model.layers.{idx}",
+                f"model.language_model.layers.{idx}",
+                f"language_model.model.layers.{idx}",
+                f"language_model.layers.{idx}",
                 f"layers.{idx}",
                 f"transformer.h.{idx}",
                 f"gpt_neox.layers.{idx}",
@@ -355,9 +363,19 @@ class DeepTap:
                                     return (act, False)
                             return (mlp_mod, False)
                 if sub == "attn":
-                    for attn_name in ("self_attn", "attn", "attention"):
+                    for attn_name in ("self_attn", "linear_attn", "attn", "attention"):
                         attn_mod = getattr(block, attn_name, None)
                         if attn_mod is not None:
+                            for h_attr in (
+                                "num_heads",
+                                "num_v_heads",
+                                "num_attention_heads",
+                                "n_head",
+                            ):
+                                mh = getattr(attn_mod, h_attr, None)
+                                if isinstance(mh, int) and mh > 0:
+                                    self._parent_heads[parent] = mh
+                                    break
                             for o_name in ("o_proj", "c_proj", "out_proj", "dense"):
                                 o_proj = getattr(attn_mod, o_name, None)
                                 if o_proj is not None and hasattr(
@@ -368,7 +386,15 @@ class DeepTap:
 
         # 3. Special modules: logits / norm / embed
         if parent == "logits":
-            for cand in ("lm_head", "embed_out", "head", "output", "classifier"):
+            for cand in (
+                "lm_head",
+                "language_model.lm_head",
+                "model.lm_head",
+                "embed_out",
+                "head",
+                "output",
+                "classifier",
+            ):
                 mod = self._try_get(model, cand)
                 if mod is not None:
                     return (mod, False)
@@ -377,6 +403,9 @@ class DeepTap:
         if parent == "norm":
             for cand in (
                 "model.norm",
+                "model.language_model.norm",
+                "language_model.model.norm",
+                "language_model.norm",
                 "transformer.ln_f",
                 "gpt_neox.final_layer_norm",
                 "ln_f",
@@ -389,6 +418,9 @@ class DeepTap:
         if parent == "embed":
             for cand in (
                 "model.embed_tokens",
+                "model.language_model.embed_tokens",
+                "language_model.model.embed_tokens",
+                "language_model.embed_tokens",
                 "embed_tokens",
                 "transformer.wte",
                 "wte",
@@ -414,6 +446,11 @@ class DeepTap:
             h = getattr(cfg, "num_attention_heads", getattr(cfg, "n_head", None))
             if isinstance(h, int) and h > 0:
                 return h
+            text_cfg = getattr(cfg, "text_config", None)
+            if text_cfg is not None:
+                th = getattr(text_cfg, "num_attention_heads", getattr(text_cfg, "n_head", None))
+                if isinstance(th, int) and th > 0:
+                    return th
         return None
 
     def attach(self, model: Any) -> list[Any]:
@@ -448,6 +485,9 @@ class DeepTap:
         if "int8" in raw_dtype or "char" in raw_dtype:
             t = t.float() * self.scale
             self.dtype_meta["source"] = "int8_dequantized_on_device"
+        elif "float8" in raw_dtype:
+            t = t.float()
+            self.dtype_meta["source"] = "fp8_upcast_on_device"
 
         if t.ndim == 1:
             t2d = t.unsqueeze(0)
@@ -468,8 +508,8 @@ class DeepTap:
         # 2. Attention heads: per-head L2 norm / RMS across head_dim when D == H * head_dim
         if parent.endswith(".attn"):
             max_req = max(locals_only) + 1 if locals_only else 1
-            n_heads = self.num_heads
-            if n_heads is not None and dim > n_heads and dim % n_heads == 0:
+            n_heads = self._parent_heads.get(parent, self.num_heads)
+            if n_heads is not None and n_heads >= max_req and dim > n_heads and dim % n_heads == 0:
                 head_dim = dim // n_heads
                 heads_view = t2d.float().reshape(seq_len, n_heads, head_dim)
                 if self.head_reduction == "rms":
@@ -557,10 +597,15 @@ class DeepTap:
                 flip = self._flip[parent]
                 slot = self.pinned[parent][flip]
                 self._flip[parent] = flip ^ 1
-                slot.copy_(gathered, non_blocking=True)
-                self._staging_seq[parent] = slot.read_matrix()
-                for col, value in zip(col_ids, slot.read()):
-                    self._staging[col] = value
+                if _is_torch_tensor(gathered) and getattr(gathered, "is_cuda", False):
+                    # Defer host transfer until flush_sequence so hooks never stall CUDA
+                    g_det = gathered.detach()
+                    self._staging_seq[parent] = g_det.unsqueeze(0) if g_det.ndim == 1 else g_det
+                else:
+                    slot.copy_(gathered, non_blocking=True)
+                    self._staging_seq[parent] = slot.read_matrix()
+                    for col, value in zip(col_ids, slot.read()):
+                        self._staging[col] = value
             except Exception:
                 self.detach()
                 self.flags["hook_detached"] = True
@@ -634,31 +679,87 @@ class DeepTap:
             self._staging_seq = {}
             return 0
 
-        seq_len = max(mat.shape[0] for mat in self._staging_seq.values())
+        seq_len = max(int(mat.shape[0]) for mat in self._staging_seq.values())
         w = len(self.watched)
-        full_mat = np.full((seq_len, w), np.nan, dtype=np.float64)
-        for parent, cols in self.groups.items():
-            mat = self._staging_seq.get(parent)
-            if mat is None:
-                continue
-            for local_k, (_, _, col_id) in enumerate(cols):
-                if mat.shape[0] == seq_len:
-                    full_mat[:, col_id] = mat[:, local_k]
+        first_item = next(iter(self._staging_seq.values()))
+        if _is_torch_tensor(first_item) and getattr(first_item, "is_cuda", False):
+            import torch
+
+            dev = first_item.device
+            gpu_mat = torch.full((seq_len, w), float("nan"), dtype=torch.float32, device=dev)
+            for parent in self.groups:
+                t_item = self._staging_seq.get(parent)
+                if t_item is None:
+                    continue
+                t_f = (
+                    t_item.float()
+                    if _is_torch_tensor(t_item)
+                    else torch.as_tensor(t_item, dtype=torch.float32, device=dev)
+                )
+                if t_f.device != dev:
+                    t_f = t_f.to(device=dev)
+                c_idx = torch.as_tensor(self._group_col_np[parent], dtype=torch.long, device=dev)
+                if int(t_f.shape[0]) == seq_len:
+                    gpu_mat.index_copy_(1, c_idx, t_f)
                 else:
-                    full_mat[-1, col_id] = mat[-1, local_k]
+                    gpu_mat[-1:].index_copy_(1, c_idx, t_f[-1:])
+            # Single host transfer for the entire watched activation slice
+            full_mat = np.asarray(gpu_mat.to(device="cpu").numpy(), dtype=np.float64)
+        else:
+            full_mat = np.full((seq_len, w), np.nan, dtype=np.float64)
+            for parent in self.groups:
+                raw_mat = self._staging_seq.get(parent)
+                if raw_mat is None:
+                    continue
+                mat = raw_mat if isinstance(raw_mat, np.ndarray) else _to_2d_numpy(raw_mat)
+                col_arr = self._group_col_np[parent]
+                if mat.shape[0] == seq_len:
+                    full_mat[:, col_arr] = mat
+                else:
+                    full_mat[-1, col_arr] = mat[-1]
 
         self._staging = {}
         self._staging_seq = {}
         self._prefill_done = True
 
         if self.capture_mode in ("decode_only", "last_token"):
-            rows_to_commit = [full_mat[-1]]
+            eff_mat = full_mat[-1:]
         else:
-            rows_to_commit = [full_mat[i] for i in range(seq_len)]
+            eff_mat = full_mat
 
+        n_rows = int(eff_mat.shape[0])
         base_pos = self._auto_token_cursor if start_pos is None else int(start_pos)
+
+        # Fast vectorized commit path for unconditional 'always' trigger without sidecar
+        if self.trigger.get("kind", "always") == "always" and self.sidecar is None:
+            w_start = int(self.window.get("start_token", 0))
+            w_end = int(self.window.get("end_token", 1 << 30))
+            every_n = int(self.window.get("every_n", 1))
+            if every_n >= 1:
+                armed_offsets = [
+                    off
+                    for off in range(n_rows)
+                    if w_start <= (base_pos + off) < w_end
+                    and ((base_pos + off) - w_start) % every_n == 0
+                ]
+            else:
+                armed_offsets = []
+            if self.capacity_tokens is not None:
+                rem = max(0, self.capacity_tokens - len(self.ring))
+                if len(armed_offsets) > rem:
+                    self.flags["ring_overflow"] = True
+                    armed_offsets = armed_offsets[:rem]
+            if armed_offsets:
+                sub = eff_mat[armed_offsets]
+                self.ring.extend(sub.tolist())
+                self.token_positions.extend(base_pos + off for off in armed_offsets)
+                self.flags["triggered"] = True
+            self._auto_token_cursor = base_pos + n_rows
+            return len(armed_offsets)
+
         committed = 0
-        for offset, row_arr in enumerate(rows_to_commit):
+        for offset in range(n_rows):
+            row_arr = eff_mat[offset]
             pos = base_pos + offset
             gate_values = {
                 addr: float(row_arr[col])
@@ -667,7 +768,7 @@ class DeepTap:
             }
             if self._commit_row(pos, gate_values, elapsed_s=elapsed_s, flags=flags):
                 committed += 1
-        self._auto_token_cursor = base_pos + len(rows_to_commit)
+        self._auto_token_cursor = base_pos + n_rows
         return committed
 
     def end_token(
@@ -686,6 +787,13 @@ class DeepTap:
             self._staging = {}
             self._staging_seq = {}
             return False
+        if self._staging_seq and not self._staging:
+            for parent, cols in self.groups.items():
+                raw_m = self._staging_seq.get(parent)
+                if raw_m is not None:
+                    m2d = raw_m if isinstance(raw_m, np.ndarray) else _to_2d_numpy(raw_m)
+                    for local_k, (_, _, col_id) in enumerate(cols):
+                        self._staging[col_id] = float(m2d[-1, local_k])
         gate_values: dict[str, float] = {}
         for col, addr in enumerate(self.watched):
             if col in self._staging:
