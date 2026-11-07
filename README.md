@@ -30,6 +30,7 @@
 </p>
 
 [Try in Colab](#-try-it-in-colab-zero-setup) •
+[Featured Research: Qwen3.8-27B Case Study](docs/DISCOVERY_QWEN_SAFETY.md) •
 [Leaderboard](BENCHMARKS.md) •
 [Why GlassBox?](#why-glassbox) •
 [Key Features](#key-features) •
@@ -60,6 +61,25 @@ To debug models mechanistically, researchers need internal states. However, naiv
 | **Integrity** | Mutable database rows | **Cryptographic SHA-256 seal** + append-only provenance chain |
 | **Interpretability** | Surface prompt analysis | **Logit Lens**, **Direct Logit Attribution (DLA)**, **SAE Latents** |
 | **Visualization** | Heavy web dashboards (React/Node) | **Calm Viewer**: 100% self-contained single-file HTML & inline SVG |
+
+---
+
+## 🔬 Featured Case Study: Uncovering Frontier Reasoning Safety Circuits
+
+> **Read the full empirical whitepaper:** [**docs/DISCOVERY_QWEN_SAFETY.md**](docs/DISCOVERY_QWEN_SAFETY.md)  
+> **Replication Notebook:** [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/azzouzabdelhak68-ship-it/glassbox/blob/main/notebooks/a100_stretch_test.ipynb)
+
+In a stress test on an **NVIDIA A100-SXM4-80GB**, GlassBox recorded **893 tokens across 4,626 internal probes per token** (`4,096` MLP neurons + `256` Attention Heads + `256` Residual Slices + 16-Layer Parallel Logit Lens) inside **`Qwen/Qwen3.8-27B`** with zero GPU stalls, streaming directly to Google Drive under a strict 1 GB budget.
+
+<p align="center">
+  <img src="docs/assets/mechanistic_discoveries_deep.png" alt="Mechanistic Discoveries in Qwen3.8-27B with GlassBox" width="95%">
+</p>
+
+### Key Empirical Discoveries:
+1. **Two-Regime `<think>` Faithfulness:** The binary refusal decision is **locked 7 tokens before generation starts** at the user turn's `<|im_end|>` sink (`+9.71` and `+11.51` on harmful triggers vs. `+0.50` on benign twins). `<think>` is not confabulatory, however: it conducts a genuine high-entropy deliberation (`5.9x` higher median entropy) over dual-use safe boundaries, showing a **second internal self-censorship wave** mid-thought.
+2. **Latent Chinese RLHF Circuit & `"Need final in English."`:** English harmful prompts collateral-activate latent Chinese alignment tokens (`无害` *"harmless"*, `合法` *"lawful"*, `拒绝` *"refuse"*) at Layers 39–56, driving **26% probability toward `'中文'` at Layer 56** and causally forcing the model's `<think>` to explicitly emit `"Need final in English."` to prevent a cross-lingual leak.
+3. **16-Layer Entropy Double Crossover:** Gated DeltaNet recurrent layers (`L-01..L-51`) maintain semantic fluidity before undergoing an immediate **`-5.4` nat collapse** at `L-56` when transitioning into global full attention.
+4. **Layer-18 Tripwire Sentinels:** Probing all 256 attention heads uncovered heads `A-18-01`, `A-18-02`, and `A-18-03` firing with `+64%` higher L2 norm on harmful words at only 28% model depth.
 
 ---
 
