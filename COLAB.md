@@ -13,6 +13,8 @@ When you click the badge above and hit **Run all**, it runs the whole pipeline i
 2. **Runs a live speed test:** Compares normal PyTorch vs. standard hooks vs. GlassBox async DMA so you can see the **<1% overhead** live on your screen.
 3. **Inspects what neurons are doing:** Shows layer-by-layer predictions (Logit Lens) and top-firing neurons as tokens pass through the prompt.
 4. **Opens the visual report:** Renders the interactive single-file HTML report right inside the notebook.
+5. **Exports token-by-token telemetry & Frontier-LLM prompt:** Generates a general analysis prompt ready to paste into Claude, GPT-4o, or Gemini to analyze circuit behavior on any prompt.
+6. **1-Click Download & Community Discussions:** Packages your run artifacts (.ZIP), auto-saves to Google Drive, and lets you share results to the GitHub Discussions community board.
 
 ---
 

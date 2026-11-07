@@ -30,6 +30,7 @@
 </p>
 
 [Try in Colab](#-try-it-in-colab-zero-setup) •
+[Leaderboard](BENCHMARKS.md) •
 [Why GlassBox?](#why-glassbox) •
 [Key Features](#key-features) •
 [Architecture](#architecture) •
