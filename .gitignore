@@ -31,3 +31,4 @@ build/
 .pytest_cache/
 htmlcov/
 .coverage
+.agents/
