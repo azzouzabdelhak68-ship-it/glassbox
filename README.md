@@ -330,6 +330,23 @@ glassbox view RUN-000001 --export-html ./report.html
 
 Open `report.html` in any browser — zero network requests, zero CDN dependencies, 100% portable.
 
+### 6. Real-Time Activation Steering & Causal Ablation (Read-Write Control)
+
+Transition from passive flight recording to active causal intervention. Inject steering vectors $\mathbf{x} \leftarrow \mathbf{x} + \alpha \mathbf{v}$, clamp specific neurons (`N-64-0024`), silence attention heads (`A-18-03`), or perform orthogonal subspace ablation in real time:
+
+```python
+from glassbox import SteeringController, steer, ablate
+
+controller = SteeringController(model)
+controller.add_steering(layer=64, vector=u_refusal, scale=-1.5, norm_preserve=True)
+controller.add_ablation("N-64-0024", mode="zero")
+
+with controller:
+    output = model.generate(...)
+```
+
+*(See [**docs/STEERING_GUIDE.md**](docs/STEERING_GUIDE.md) for full documentation and directional subspace projections).*
+
 ---
 
 ## Addressing Scheme & Watchlist DSL

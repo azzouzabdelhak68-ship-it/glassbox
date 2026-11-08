@@ -43,6 +43,13 @@ from glassbox.exceptions import (
 )
 from glassbox.scan import scan as _scan_impl
 from glassbox.search.index import append_hot
+from glassbox.steering import (
+    AblationTarget,
+    SteeringController,
+    SteeringVector,
+    ablate,
+    steer,
+)
 from glassbox.storage.layout import (
     allocate_run,
     default_run_context,
@@ -65,6 +72,7 @@ from glassbox.watchlist import (
 __version__ = "0.1.0"
 
 __all__ = [
+    "AblationTarget",
     "BlackBox",
     "BlackBoxError",
     "CheckpointMismatchError",
@@ -76,13 +84,17 @@ __all__ = [
     "SealBrokenError",
     "SealBrokenWarning",
     "SizeFlagError",
+    "SteeringController",
+    "SteeringVector",
     "UnknownAddressError",
     "__version__",
+    "ablate",
     "estimate_bytes",
     "flag_for_bytes",
     "lens",
     "profile",
     "scan",
+    "steer",
     "to_dataframe",
     "verify_run",
     "watch",
@@ -172,6 +184,8 @@ class _WatchContext:
         capture_mode: str = "all",
         head_reduction: str = "l2_norm",
         batch_index: int = 0,
+        steer: list[SteeringVector] | SteeringVector | None = None,
+        ablate: list[AblationTarget] | AblationTarget | None = None,
     ) -> None:
         self.watchlist = watchlist
         self.add = list(add) if add else []
@@ -190,6 +204,9 @@ class _WatchContext:
         self.capture_mode = capture_mode
         self.head_reduction = head_reduction
         self.batch_index = int(batch_index)
+        self.steer = steer
+        self.ablate = ablate
+        self.steering: SteeringController | None = None
 
         self.run_id: str | None = None
         self.run_dir: str | None = None
@@ -317,6 +334,9 @@ class _WatchContext:
             raise RuntimeError("BlackBox.watch context must be entered before attach()")
         self.tap.attach(model)
         self._attached_model = model
+        if self.steer is not None or self.ablate is not None:
+            self.steering = SteeringController(model, steer=self.steer, ablate=self.ablate)
+            self.steering.attach()
         if hasattr(model, "generate") and callable(model.generate):
             orig_gen = model.generate
             self._orig_generate = orig_gen
@@ -368,6 +388,9 @@ class _WatchContext:
         return committed
 
     def _restore_model(self) -> None:
+        if self.steering is not None:
+            self.steering.detach()
+            self.steering = None
         if self.tap is not None:
             self.tap.detach()
         if self._attached_model is not None:
@@ -542,6 +565,8 @@ class GlassBox:
         capture_mode: str = "all",
         head_reduction: str = "l2_norm",
         batch_index: int = 0,
+        steer: list[SteeringVector] | SteeringVector | None = None,
+        ablate: list[AblationTarget] | AblationTarget | None = None,
     ) -> _WatchContext:
         """Declare a Deep watchlist; validates on ``__enter__``, seals on ``__exit__``."""
         return _WatchContext(
@@ -561,6 +586,8 @@ class GlassBox:
             capture_mode=capture_mode,
             head_reduction=head_reduction,
             batch_index=batch_index,
+            steer=steer,
+            ablate=ablate,
         )
 
     @staticmethod
@@ -664,6 +691,8 @@ def watch(
     capture_mode: str = "all",
     head_reduction: str = "l2_norm",
     batch_index: int = 0,
+    steer: list[SteeringVector] | SteeringVector | None = None,
+    ablate: list[AblationTarget] | AblationTarget | None = None,
 ) -> _WatchContext:
     """Module-level alias for :meth:`GlassBox.watch`."""
     return GlassBox.watch(
@@ -683,6 +712,8 @@ def watch(
         capture_mode=capture_mode,
         head_reduction=head_reduction,
         batch_index=batch_index,
+        steer=steer,
+        ablate=ablate,
     )
 
 
