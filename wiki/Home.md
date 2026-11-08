@@ -212,6 +212,7 @@ wiki/
 ├── Discovery-and-Hypothesis-Catalog.md      ◄ Empirical Qwen3.8-27B discoveries & research catalog
 ├── Activation-Steering-and-Ablation-Guide.md◄ Causal steering, norm preservation & subspace ablation
 ├── Architecture-and-Internals.md            ◄ Non-blocking DMA, GBSPR001, SHA-256 sealing & Logit Lens
+├── Distributed-Serving-and-Multi-GPU-Architecture.md ◄ Distributed serving, vLLM/SGLang, TP sharding & zero-NVLink entropy
 ├── Cookbook-Colab-and-Solo-Testing.md       ◄ Google Colab 20-min budget, Drive streaming & fallbacks
 └── Cookbook-Troubleshooting-and-FAQ.md      ◄ Error codes E02-E07, OOM mitigations & verification FAQ
 ```
@@ -264,7 +265,14 @@ wiki/
 - **Cryptographic Run Provenance:** 5-step tamper-evident verification algorithm, canonical JSON replay serialization, and inter-process file locking on `chain.jsonl`.
 - **16-Layer Parallel Logit Lens Engine:** Residual stream unembedding projection, layer delta updates, and Shannon entropy metrics across depth.
 
-### 6. [Colab & Solo Testing Cookbook](Cookbook-Colab-and-Solo-Testing.md)
+### 6. [Distributed Serving & Multi-GPU Architecture](Distributed-Serving-and-Multi-GPU-Architecture.md)
+*Production-grade interpretability for vLLM V1 and SGLang SRT across multi-GPU nodes.*
+- **Engine Backend Protocol:** Decoupled `BaseEngineAdapter`, `VLLMEngineAdapter` (`GlassBoxWorkerExtension`), and `SGLangEngineAdapter`.
+- **Zero-NVLink Distributed Sharding:** Passive Rank-0 residual capture with all-rank active steering, and 3-scalar $(m_r, s_r, w_r)$ Shannon entropy reduction (12 B/tok).
+- **Two-Stage CUDA Graph-Safe Wiretap:** `glassbox::tap` static gather op with 3-element `ctl` device control tensor and non-blocking out-of-graph D2H copy.
+- **Wait-Free SPSC Host Ring Buffer & Rust Collator:** Pinned host memory with fail-open `DROP_NEWEST` policy, 256MB segmented WALs, dynamic virtual multi-rank indexing, and offline `GBSPR001` compactor.
+
+### 7. [Colab & Solo Testing Cookbook](Cookbook-Colab-and-Solo-Testing.md)
 *Hands-on guide for independent experimenters and testing in Google Colab.*
 - **Solo Tester Workflows:** Running full mechanistic evaluations on consumer hardware or free Google Colab (T4 / CPU).
 - **Google Colab 20-Minute Budget Management:** Complete runtime strategy with an automated 16.5-minute safety watchdog to avoid GPU disconnects.
@@ -272,7 +280,7 @@ wiki/
 - **DeltaNet Fast Kernel Guards & Auto-Fallbacks:** Intercepting missing C++ wheels (`fla` / `causal_conv1d`) to prevent slow CPU loop hangs by falling back to native BF16 `Qwen/Qwen3-14B`.
 - **Low-Cost Experiment Recipes:** Step-by-step instructions for running Indirect Object Identification (IOI) circuits and small-scale factual recall probes.
 
-### 7. [Troubleshooting & FAQ Cookbook](Cookbook-Troubleshooting-and-FAQ.md)
+### 8. [Troubleshooting & FAQ Cookbook](Cookbook-Troubleshooting-and-FAQ.md)
 *Comprehensive diagnostics, error resolution, and frequently asked questions.*
 - **Master Error Code Diagnostic Table:** Root causes, reproduction steps, and immediate fixes for errors `E02`, `E03`, `E04`, `E05`, `E06`, and `E07`.
 - **GPU Memory & OOM Mitigations:** Watchlist subsampling, precision tuning (`fp16`/`bf16`), chunked sparse compression, and Docker shared memory configuration (`--shm-size=1g`).

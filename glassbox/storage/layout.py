@@ -264,8 +264,8 @@ def default_run_context(
         "versions": {
             "torch": "unknown",
             "cuda": "cpu",
-            "glassbox": "0.1.0",
-            "blackbox": "0.1.0",
+            "glassbox": "2.0.0",
+            "blackbox": "2.0.0",
             "adapter": "cpu",
         },
         "flags": {

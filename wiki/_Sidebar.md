@@ -43,6 +43,13 @@
   * [Chunked Sparse Format](Architecture-and-Internals.md#chunked-sparse-binary-storage-deepbin)
   * [SHA-256 Provenance Ledger](Architecture-and-Internals.md#run-provenance-and-cryptographic-sealing)
 
+* **[Distributed Serving & Multi-GPU](Distributed-Serving-and-Multi-GPU-Architecture.md)**
+  * [vLLM & SGLang Backends](Distributed-Serving-and-Multi-GPU-Architecture.md#engine-backend-abstraction-layer)
+  * [Tensor Parallel Sharding](Distributed-Serving-and-Multi-GPU-Architecture.md#distributed-tensor-parallel-sharding)
+  * [Zero-NVLink Shannon Entropy](Distributed-Serving-and-Multi-GPU-Architecture.md#zero-nvlink-logits-shannon-entropy-reduction)
+  * [CUDA Graph-Safe Tap Op](Distributed-Serving-and-Multi-GPU-Architecture.md#two-stage-cuda-graph-safe-wiretap)
+  * [Rust Segmented WAL Collator](Distributed-Serving-and-Multi-GPU-Architecture.md#wait-free-spsc-host-ring-buffer-rust-collator)
+
 ---
 
 ### Empirical Research
@@ -81,5 +88,5 @@
 
 ---
 <div align="center">
-  <sub>GlassBox v0.1.0 • PolyForm Noncommercial</sub>
+  <sub>GlassBox v2.0.0 • PolyForm Noncommercial</sub>
 </div>

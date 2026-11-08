@@ -15,7 +15,7 @@
 [![License: PolyForm Noncommercial](https://img.shields.io/badge/license-PolyForm%20Noncommercial-blue.svg)](LICENSE)
 [![Ruff: Compliant](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type Checked: Mypy](https://img.shields.io/badge/type%20checked-mypy-blue.svg)](https://mypy-lang.org/)
-[![Status: v0.1.0](https://img.shields.io/badge/release-v0.1.0-brightgreen.svg)]()
+[![Status: v2.0.0](https://img.shields.io/badge/release-v2.0.0-brightgreen.svg)]()
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/azzouzabdelhak68-ship-it/glassbox/blob/main/notebooks/quickstart_demo.ipynb)
 
 <p align="center">
@@ -33,6 +33,7 @@
 [Try in Colab](#-try-it-in-colab-zero-setup) •
 [Featured Research: Qwen3.8-27B Case Study](docs/DISCOVERY_QWEN_SAFETY.md) •
 [Leaderboard](BENCHMARKS.md) •
+[GlassBox 2.0 (Distributed)](#-glassbox-20-fast-distributed-serving--multi-gpu-sharding) •
 [Why GlassBox?](#why-glassbox) •
 [Key Features](#key-features) •
 [Architecture](#architecture) •
@@ -81,6 +82,60 @@ In a stress test on an **NVIDIA A100-SXM4-80GB**, GlassBox recorded **893 tokens
 2. **Latent Chinese RLHF Circuit & `"Need final in English."`:** English harmful prompts collateral-activate latent Chinese alignment tokens (`无害` *"harmless"*, `合法` *"lawful"*, `拒绝` *"refuse"*) at Layers 39–56, driving **26% probability toward `'中文'` at Layer 56** and causally forcing the model's `<think>` to explicitly emit `"Need final in English."` to prevent a cross-lingual leak.
 3. **16-Layer Entropy Double Crossover:** Gated DeltaNet recurrent layers (`L-01..L-51`) maintain semantic fluidity before undergoing an immediate **`-5.4` nat collapse** at `L-56` when transitioning into global full attention.
 4. **Layer-18 Tripwire Sentinels:** Probing all 256 attention heads uncovered heads `A-18-01`, `A-18-02`, and `A-18-03` firing with `+64%` higher L2 norm on harmful words at only 28% model depth.
+
+---
+
+## 🚀 GlassBox 2.0: Fast Distributed Serving & Multi-GPU Sharding
+
+GlassBox 2.0 expands from a single-GPU research instrument into a high-throughput, distributed mechanistic interpretability platform engineered for production continuous-batching engines (**vLLM V1** and **SGLang SRT**) across multi-GPU nodes with Tensor Parallelism (TP).
+
+```
+=======================================================================================================================
+                                      GLASSBOX 2.0 DISTRIBUTED ARCHITECTURE
+=======================================================================================================================
+
+     [ Client Request Traffic ] ── (Continuous Batching: vLLM V1 / SGLang SRT)
+                  │
+   ┌──────────────┴──────────────── Distributed Tensor Parallel (TP=N) ───────────────────────────────┐
+   │                                                                                                  │
+   │   ┌───────────────────────────────┐                  ┌───────────────────────────────┐           │
+   │   │         GPU Rank 0            │                  │         GPU Rank r (r > 0)    │           │
+   │   │  • Passive Residual: RECORD   │                  │  • Passive Residual: SKIPPED  │           │
+   │   │  • Active Steering: STEER ALL │                  │  • Active Steering: STEER ALL │           │
+   │   │  • Modulo Heads & Neurons     │                  │  • Modulo Heads & Neurons     │           │
+   │   │  • Local Reduction: (m_0,s,w) │                  │  • Local Reduction: (m_r,s,w) │           │
+   │   │    12 B/tok (0 NVLink Traffic)│                  │    12 B/tok (0 NVLink Traffic)│           │
+   │   │  • glassbox::tap(act,ctl,slab)│                  │  • glassbox::tap(act,ctl,slab)│           │
+   │   └──────────────┬────────────────┘                  └──────────────┬────────────────┘           │
+   └──────────────────┼──────────────────────────────────────────────────┼────────────────────────────┘
+                      ▼                                                  ▼
+     ┌─────────────────────────────────┐                ┌─────────────────────────────────┐
+     │ Wait-Free SPSC Host Ring Buffer │                │ Wait-Free SPSC Host Ring Buffer │
+     │ • DROP_NEWEST Fail-Open Policy  │                │ • DROP_NEWEST Fail-Open Policy  │
+     └────────────────┬────────────────┘                └────────────────┬────────────────┘
+                      │                                                  │
+                      └───────────────────────┬──────────────────────────┘
+                                              ▼
+                             ┌─────────────────────────────────┐
+                             │ Tri-Language Virtual Index      │
+                             │ (crates/glassbox_collator/)     │
+                             │ • Virtual Index Join (Step, Req)│
+                             │ • Zero Physical File Merging    │
+                             │ • Exact Global Shannon Entropy  │
+                             │ • Offline GBSPR001 Compactor    │
+                             └─────────────────────────────────┘
+=======================================================================================================================
+```
+
+### Key Innovations in 2.0:
+1. **Pluggable Serving Backends**: Native `VLLMEngineAdapter` (`GlassBoxWorkerExtension`) for vLLM V1 continuous batching, `SGLangEngineAdapter` for SRT RadixAttention, and `PyTorchEngineAdapter` for single-GPU workflows. Lightweight CPU `StepManifest` tracks token layouts across continuous batching requests.
+2. **Zero-NVLink TP Sharding**:
+   - Residual stream probes (`L-*`, `NORM`, `EMBED`) are recorded only on **Rank 0** (saving host RAM/disk), while active steering interventions are applied to **all ranks** to prevent hidden state divergence.
+   - Exact global Shannon entropy is reconstructed from a local **3-scalar reduction** $(m_r, s_r, w_r)$ with only **12 bytes per token** and zero NVLink synchronization.
+3. **Two-Stage CUDA Graph-Safe Wiretap**: In-graph gather op `glassbox::tap` writing to a static staging slab governed by a 3-element device control tensor `ctl` (`ctl[0]` kill-switch, `ctl[1]` actual tokens, `ctl[2]` slot index), followed by asynchronous out-of-graph D2H DMA copy. Registered Triton and pure-Python NumPy fallbacks guarantee execution across any hardware.
+4. **Rust Segmented WAL Collator & SPSC Ring Buffer**: Pinned host memory wait-free SPSC ring buffer with `DROP_NEWEST` fail-open backpressure handling. Segmented 256MB WALs with `posix_fadvise(DONTNEED)` page cache eviction, and dynamic virtual multi-rank indexing joining `(step_id, req_id)` with zero physical file merges.
+
+*(Read the complete architectural specification in [**wiki/Distributed-Serving-and-Multi-GPU-Architecture.md**](wiki/Distributed-Serving-and-Multi-GPU-Architecture.md)).*
 
 ---
 
@@ -347,6 +402,32 @@ with controller:
 ```
 
 *(See [**docs/STEERING_GUIDE.md**](docs/STEERING_GUIDE.md) for full documentation and directional subspace projections).*
+
+### 7. Distributed Serving & Continuous Batching (vLLM & SGLang)
+
+Attach GlassBox to high-throughput production serving engines with zero NVLink communication:
+
+```python
+from glassbox import GlassBox
+
+# Automatically detect vLLM or SGLang worker extension
+with GlassBox.watch(
+    watchlist={
+        "entries": [
+            {"addresses": ["L-18", "A-18-01..04", "LOGITS-ENTROPY"]},
+        ]
+    },
+    backend="auto",
+    tp_size=4,
+    tp_rank=0,
+) as recorder:
+    # Run continuous batching requests
+    pass
+
+# Query multi-rank virtual index after run completion
+reader = GlassBox.open_reader("runs/RUN-000001")
+slice_data = reader.query_slice(global_step_id=42, req_id="req-101", address="A-18-01")
+```
 
 ---
 

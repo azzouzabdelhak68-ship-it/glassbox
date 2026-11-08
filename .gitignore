@@ -33,3 +33,4 @@ htmlcov/
 .coverage
 target/
 .agents/
+*.lnk

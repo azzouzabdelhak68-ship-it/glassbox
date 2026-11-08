@@ -14,7 +14,9 @@ Covers Features 19-25:
 
 from __future__ import annotations
 
+import shutil
 import subprocess
+import pytest
 import tempfile
 from pathlib import Path
 
@@ -86,6 +88,8 @@ class TestFeature19HostRingBufferSPSC:
 
     def test_cpp_ring_buffer_compiles_and_passes_spsc_contracts(self):
         """Compile and execute C++ test verifying csrc/ring_buffer.h SPSC mechanics."""
+        if shutil.which("g++") is None:
+            pytest.skip("g++ compiler not found in PATH")
         test_cpp_source = """
 #include "csrc/ring_buffer.h"
 #include <cassert>
@@ -159,6 +163,8 @@ class TestFeature20DropNewestFailOpenPolicy:
 
     def test_cpp_ring_buffer_drop_newest_under_backpressure(self):
         """Verify producer never blocks under full capacity and emits tombstones."""
+        if shutil.which("g++") is None:
+            pytest.skip("g++ compiler not found in PATH")
         test_cpp_source = """
 #include "csrc/ring_buffer.h"
 #include <cassert>

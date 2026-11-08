@@ -36,6 +36,7 @@ REQUIRED_PRIMARY_PAGES = [
     "Discovery-and-Hypothesis-Catalog.md",
     "Activation-Steering-and-Ablation-Guide.md",
     "Architecture-and-Internals.md",
+    "Distributed-Serving-and-Multi-GPU-Architecture.md",
 ]
 
 REQUIRED_COOKBOOKS = [

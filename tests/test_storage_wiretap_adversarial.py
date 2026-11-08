@@ -16,6 +16,7 @@ Evaluates glassbox/csrc_fallback.py, csrc/ring_buffer.h, and glassbox/storage/co
 from __future__ import annotations
 
 import math
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -224,6 +225,8 @@ class TestHostRingBufferAdversarial:
     def test_cpp_ring_buffer_stress_harness(self):
         """Compile and execute C++ stress harness verifying DROP_NEWEST,
         boundaries, and concurrency."""
+        if shutil.which("g++") is None:
+            pytest.skip("g++ compiler not found in PATH")
         cpp_code = """
 #include "csrc/ring_buffer.h"
 #include <cassert>
