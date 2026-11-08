@@ -29,6 +29,7 @@
   </a>
 </p>
 
+[Docs & Guides](docs/README.md) •
 [Try in Colab](#-try-it-in-colab-zero-setup) •
 [Featured Research: Qwen3.8-27B Case Study](docs/DISCOVERY_QWEN_SAFETY.md) •
 [Leaderboard](BENCHMARKS.md) •

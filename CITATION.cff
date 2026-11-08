@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use GlassBox in your research, please cite it as below."
+title: "GlassBox: Zero-Overhead Flight Recorder & Mechanistic Interpretability Engine for PyTorch LLMs"
+abstract: "A zero-overhead flight recorder and mechanistic interpretability engine for PyTorch LLMs, providing non-blocking asynchronous DMA activation streaming, real-time activation steering and causal ablation, multi-layer Logit Lens, and cryptographically sealed provenance."
+authors:
+  - family-names: "Azzouz"
+    given-names: "Abdelhak"
+date-released: 2026-11-07
+url: "https://github.com/azzouzabdelhak68-ship-it/glassbox"
+repository-code: "https://github.com/azzouzabdelhak68-ship-it/glassbox"
+license: "PolyForm-Noncommercial-1.0.0"
+keywords:
+  - "mechanistic interpretability"
+  - "ai safety"
+  - "pytorch"
+  - "large language models"
+  - "activation steering"
+  - "causal ablation"
+  - "flight recorder"
+  - "logit lens"
+  - "representation engineering"
