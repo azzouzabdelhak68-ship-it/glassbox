@@ -25,6 +25,19 @@ from datetime import datetime, timezone
 from types import TracebackType
 from typing import Any
 
+from glassbox.backends import (
+    BaseEngineAdapter,
+    GlassBoxWorkerExtension,
+    PyTorchEngineAdapter,
+    SGLangEngineAdapter,
+    StepManifest,
+    VLLMEngineAdapter,
+    detect_backend,
+    get_backend,
+    list_backends,
+    register_backend,
+    resolve_backend,
+)
 from glassbox.controller import (
     check_checkpoint,
     estimate_size,
@@ -73,26 +86,37 @@ __version__ = "0.1.0"
 
 __all__ = [
     "AblationTarget",
+    "BaseEngineAdapter",
     "BlackBox",
     "BlackBoxError",
     "CheckpointMismatchError",
     "DeepTap",
     "GlassBox",
     "GlassBoxError",
+    "GlassBoxWorkerExtension",
     "ManifestExistsError",
+    "PyTorchEngineAdapter",
     "RunNotFoundError",
+    "SGLangEngineAdapter",
     "SealBrokenError",
     "SealBrokenWarning",
     "SizeFlagError",
     "SteeringController",
     "SteeringVector",
+    "StepManifest",
     "UnknownAddressError",
+    "VLLMEngineAdapter",
     "__version__",
     "ablate",
+    "detect_backend",
     "estimate_bytes",
     "flag_for_bytes",
+    "get_backend",
     "lens",
+    "list_backends",
     "profile",
+    "register_backend",
+    "resolve_backend",
     "scan",
     "steer",
     "to_dataframe",
@@ -186,6 +210,9 @@ class _WatchContext:
         batch_index: int = 0,
         steer: list[SteeringVector] | SteeringVector | None = None,
         ablate: list[AblationTarget] | AblationTarget | None = None,
+        backend: str = "auto",
+        tp_size: int | None = None,
+        tp_rank: int | None = None,
     ) -> None:
         self.watchlist = watchlist
         self.add = list(add) if add else []
@@ -206,7 +233,11 @@ class _WatchContext:
         self.batch_index = int(batch_index)
         self.steer = steer
         self.ablate = ablate
+        self.backend = str(backend)
+        self.tp_size = tp_size
+        self.tp_rank = tp_rank
         self.steering: SteeringController | None = None
+        self.adapter: BaseEngineAdapter | None = None
 
         self.run_id: str | None = None
         self.run_dir: str | None = None
@@ -328,52 +359,46 @@ class _WatchContext:
             self.attach(self.model)
         return self
 
-    def attach(self, model: Any) -> DeepTap:
-        """Attach DeepTap hooks to ``model`` and wrap its ``generate``/``forward``."""
+    def attach(self, model: Any) -> Any:
+        """Attach engine adapter hooks to ``model`` and wrap its ``generate``/``forward``."""
         if self.tap is None:
             raise RuntimeError("BlackBox.watch context must be entered before attach()")
-        self.tap.attach(model)
+
+        adapter_cls = resolve_backend(backend=self.backend, engine=model)
+        self.adapter = adapter_cls(
+            tp_rank=self.tp_rank if self.tp_rank is not None else 0,
+            tp_size=self.tp_size if self.tp_size is not None else 1,
+        )
+        merged_win = self._wl.get("merged_window", self.window)
+        eff_trigger = self._wl.get("effective_trigger", self.trigger)
+        eff_precision = self._wl.get("effective_precision", self.precision)
+
+        ret = self.adapter.attach(
+            model,
+            watchlist=self._wl,
+            tap=self.tap,
+            steer=self.steer,
+            ablate=self.ablate,
+            prompt=self.prompt_text,
+            window=merged_win,
+            trigger=eff_trigger,
+            precision=eff_precision,
+            capture_mode=self.capture_mode,
+            head_reduction=self.head_reduction,
+            batch_index=self.batch_index,
+        )
         self._attached_model = model
-        if self.steer is not None or self.ablate is not None:
-            self.steering = SteeringController(model, steer=self.steer, ablate=self.ablate)
-            self.steering.attach()
-        if hasattr(model, "generate") and callable(model.generate):
-            orig_gen = model.generate
-            self._orig_generate = orig_gen
 
-            def _wrapped_generate(*args: Any, **kwargs: Any) -> Any:
-                if args and isinstance(args[0], str) and not self.prompt_text:
-                    self.prompt_text = args[0]
-                elif isinstance(kwargs.get("prompt"), str) and not self.prompt_text:
-                    self.prompt_text = str(kwargs["prompt"])
-                res = orig_gen(*args, **kwargs)
-                if self.tap is not None and self.tap._staging_seq:
-                    self.tap.flush_sequence()
-                if isinstance(res, str):
-                    self.output_text = res
-                elif hasattr(res, "text") and isinstance(res.text, str):
-                    self.output_text = res.text
-                return res
+        if hasattr(self.adapter, "steering") and self.adapter.steering is not None:
+            self.steering = self.adapter.steering
+        if hasattr(self.adapter, "tap") and self.adapter.tap is not None:
+            self.tap = self.adapter.tap
+        if hasattr(self.adapter, "prompt_text") and self.adapter.prompt_text:
+            self.prompt_text = self.adapter.prompt_text
+        if hasattr(self.adapter, "output_text") and self.adapter.output_text:
+            self.output_text = self.adapter.output_text
 
-            try:
-                model.generate = _wrapped_generate
-            except Exception:
-                pass
-        if hasattr(model, "forward") and callable(model.forward):
-            orig_fwd = model.forward
-            self._orig_forward = orig_fwd
-
-            def _wrapped_forward(*args: Any, **kwargs: Any) -> Any:
-                res = orig_fwd(*args, **kwargs)
-                if self.tap is not None and self.tap._staging_seq:
-                    self.tap.flush_sequence()
-                return res
-
-            try:
-                model.forward = _wrapped_forward
-            except Exception:
-                pass
-        return self.tap
+        return ret if ret is not None else self.tap
 
     def record_synthetic(self, n_tokens: int = 16, seed: int | None = None) -> int:
         """Populate deterministic architecture Deep activations when no live model ran."""
@@ -388,11 +413,23 @@ class _WatchContext:
         return committed
 
     def _restore_model(self) -> None:
+        if self.adapter is not None:
+            try:
+                self.adapter.detach()
+            except Exception:
+                pass
+            self.adapter = None
         if self.steering is not None:
-            self.steering.detach()
+            try:
+                self.steering.detach()
+            except Exception:
+                pass
             self.steering = None
         if self.tap is not None:
-            self.tap.detach()
+            try:
+                self.tap.detach()
+            except Exception:
+                pass
         if self._attached_model is not None:
             if self._orig_generate is not None:
                 try:
@@ -415,6 +452,23 @@ class _WatchContext:
         exc_tb: TracebackType | None,
     ) -> None:
         _ = (exc_type, exc_tb)
+        if self.adapter is not None:
+            try:
+                self.adapter.flush()
+            except Exception:
+                pass
+            if (
+                hasattr(self.adapter, "output_text")
+                and self.adapter.output_text
+                and not self.output_text
+            ):
+                self.output_text = self.adapter.output_text
+            if (
+                hasattr(self.adapter, "prompt_text")
+                and self.adapter.prompt_text
+                and not self.prompt_text
+            ):
+                self.prompt_text = self.adapter.prompt_text
         if self.tap is not None and self.tap._staging_seq:
             self.tap.flush_sequence()
         self._restore_model()
@@ -567,6 +621,9 @@ class GlassBox:
         batch_index: int = 0,
         steer: list[SteeringVector] | SteeringVector | None = None,
         ablate: list[AblationTarget] | AblationTarget | None = None,
+        backend: str = "auto",
+        tp_size: int | None = None,
+        tp_rank: int | None = None,
     ) -> _WatchContext:
         """Declare a Deep watchlist; validates on ``__enter__``, seals on ``__exit__``."""
         return _WatchContext(
@@ -588,6 +645,9 @@ class GlassBox:
             batch_index=batch_index,
             steer=steer,
             ablate=ablate,
+            backend=backend,
+            tp_size=tp_size,
+            tp_rank=tp_rank,
         )
 
     @staticmethod
@@ -693,6 +753,9 @@ def watch(
     batch_index: int = 0,
     steer: list[SteeringVector] | SteeringVector | None = None,
     ablate: list[AblationTarget] | AblationTarget | None = None,
+    backend: str = "auto",
+    tp_size: int | None = None,
+    tp_rank: int | None = None,
 ) -> _WatchContext:
     """Module-level alias for :meth:`GlassBox.watch`."""
     return GlassBox.watch(
@@ -714,6 +777,9 @@ def watch(
         batch_index=batch_index,
         steer=steer,
         ablate=ablate,
+        backend=backend,
+        tp_size=tp_size,
+        tp_rank=tp_rank,
     )
 
 

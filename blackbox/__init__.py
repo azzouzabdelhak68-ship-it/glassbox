@@ -5,6 +5,11 @@ from __future__ import annotations
 import sys
 
 import glassbox
+import glassbox.backends as _backends
+import glassbox.backends.base as _backends_base
+import glassbox.backends.pytorch as _backends_pytorch
+import glassbox.backends.sglang as _backends_sglang
+import glassbox.backends.vllm as _backends_vllm
 import glassbox.cli as _cli
 import glassbox.controller as _controller
 import glassbox.exceptions as _exceptions
@@ -31,6 +36,11 @@ import glassbox.viewer as _viewer
 import glassbox.watchlist as _watchlist
 from glassbox import *  # noqa: F403
 
+sys.modules["blackbox.backends"] = _backends
+sys.modules["blackbox.backends.base"] = _backends_base
+sys.modules["blackbox.backends.pytorch"] = _backends_pytorch
+sys.modules["blackbox.backends.vllm"] = _backends_vllm
+sys.modules["blackbox.backends.sglang"] = _backends_sglang
 sys.modules["blackbox.cli"] = _cli
 sys.modules["blackbox.controller"] = _controller
 sys.modules["blackbox.exceptions"] = _exceptions
