@@ -75,7 +75,7 @@ We built a 1-click Google Colab notebook that runs the entire test on a free T4 
 Full technical report & empirical data:
 📄 https://github.com/azzouzabdelhak68-ship-it/glassbox/blob/main/docs/DISCOVERY_QWEN_SAFETY.md
 
-GitHub Repo (Apache 2.0):
+GitHub Repo (PolyForm Noncommercial 1.0.0):
 ⭐ https://github.com/azzouzabdelhak68-ship-it/glassbox
 
 What mechanistic anomalies are hiding in your models? Star the repo and record your first run in 2 lines of code. 🔬
@@ -113,7 +113,7 @@ https://github.com/azzouzabdelhak68-ship-it/glassbox/blob/main/docs/DISCOVERY_QW
 1-click Colab to reproduce:
 https://colab.research.google.com/github/azzouzabdelhak68-ship-it/glassbox/blob/main/notebooks/a100_stretch_test.ipynb
 
-Code is Apache 2.0. We'd love feedback from the systems and mechanistic interpretability communities!
+Code is free for research & noncommercial use (PolyForm Noncommercial 1.0.0). We'd love feedback from the systems and mechanistic interpretability communities!
 
 ---
 
