@@ -50,6 +50,11 @@ profile.py → glassbox.profile() (Automated calibration profiler)
 | `lens.py` | Logit Lens and residual stream projection engine |
 | `profile.py` | Automated activation calibration and watchlist generator |
 | `benchmark.sh` | Gather methodology, JSON benchmark keys |
+| `steering.py` | SteeringController, additive vector steering, subspace ablation, and neuron clamping |
+| `backends/{base,pytorch,vllm,sglang}.py` | Engine backend adapters, StepManifest, and vLLM V1 worker extensions |
+| `tap/distributed.py` | Distributed TPShardRouter, asymmetric TP rules, and zero-NVLink Shannon entropy reduction |
+| `csrc/` & `csrc_fallback.py` | CUDA Graph-safe `glassbox::tap` op with ctl tensor, ring buffer header, and Triton/NumPy fallbacks |
+| `crates/glassbox_collator/` & `storage/collator.py` | High-speed Rust segmented WAL writer, virtual multi-rank indexer, and GBSPR001 compactor |
 
 ## Key invariants (gates enforce)
 

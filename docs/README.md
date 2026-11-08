@@ -15,7 +15,8 @@ docs/
 ├── FORMAT_GUIDE.md             <-- Binary Layout (deep.bin), Index Manifest, & SHA-256 Chains
 ├── ADAPTER_GUIDE.md            <-- Hardware Adapters: CUDA, CPU, ROCm, Apple MPS
 ├── PRESETS.md                  <-- Watchlist Presets & Addressing DSL
-└── THREAT_MODEL.md             <-- Cryptographic Integrity & Anti-Tamper Security
+├── THREAT_MODEL.md             <-- Cryptographic Integrity & Anti-Tamper Security
+└── Distributed Wiki Guide      <-- ../wiki/Distributed-Serving-and-Multi-GPU-Architecture.md
 ```
 
 ---
@@ -76,6 +77,16 @@ docs/
 * **Parallel 16-Layer Logit Lens**: Project hidden states directly into vocabulary space on-device across 16 layers simultaneously (`glassbox view RUN-ID --lens`).
 * **Direct Logit Attribution (DLA)**: Compare good vs. bad cohorts to rank which specific neurons or heads drove behavioral divergence (`glassbox compare --attribute`).
 * **Vectorized DataFrame Export**: Memory-mapped zero-copy slice reads into Pandas and Polars (`glassbox.to_dataframe("RUN-ID")`).
+
+---
+
+## 🌐 6. Distributed Production Serving & Multi-GPU (v2.0)
+
+* **[Distributed Serving Architecture](../wiki/Distributed-Serving-and-Multi-GPU-Architecture.md)**:
+  * **Serving Backends**: Continuous batching worker extensions for vLLM V1 (`GlassBoxWorkerExtension`) and SGLang SRT (`SGLangEngineAdapter`).
+  * **Zero-NVLink TP Sharding**: Local 3-scalar $(m_r, s_r, w_r)$ reduction per token (12 B/tok) reconstructing exact global Shannon entropy with 0 NVLink inter-GPU traffic.
+  * **CUDA Graph-Safe Wiretap**: Two-stage in-graph op (`glassbox::tap`) writing to static HBM slabs via `ctl` device tensor, paired with out-of-graph asynchronous D2H DMA copy.
+  * **Rust Collator & SPSC Ring Buffer**: Pinned host memory wait-free SPSC ring buffer with `DROP_NEWEST` fail-open policy, 256MB segmented WALs, and dynamic virtual multi-rank indexing.
 
 ---
 
