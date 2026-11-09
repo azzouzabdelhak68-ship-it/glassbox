@@ -1,0 +1,304 @@
+# Eureka experiment prompt battery: 5 domains x 5 de-memorized variations = 25 pairs.
+#
+# Version A = smooth baseline (no trap).  Version B = trap that invites a fast wrong
+# answer which a reasoning model may catch mid-<think>.
+#
+# Grading is a cheap regex heuristic on the text AFTER </think> (earliest match wins,
+# ties -> correct). An empty correct_re means "ungraded". Spot-check `other` outcomes.
+version: 1
+n_samples_per_prompt: 8
+pairs:
+  # ---------------- Domain 1: isomorphic arithmetic (total / difference trap) -------------
+  - id: math_01
+    domain: math
+    version_a:
+      prompt: 'A server rack draws 1,275W and a cooling unit draws 75W. What is their total power draw?'
+      correct_re: '1,?350\s*(W|watts?)'
+    version_b:
+      prompt: 'A server rack and a cooling unit draw 1,350W in total. The rack draws 1,200W more than the cooling unit. How much power does the cooling unit draw?'
+      correct_re: '(?<![\d.,])75\s*(W|watts?)'
+      trap_re: '(?<![\d.,])150\s*(W|watts?)'
+      correct_text: '75W'
+      trap_text: '150W'
+  - id: math_02
+    domain: math
+    version_a:
+      prompt: 'A phone costs $630 and its case costs $30. What is the total cost?'
+      correct_re: '660'
+    version_b:
+      prompt: 'A phone and its case cost $660 in total. The phone costs $600 more than the case. How much does the case cost?'
+      correct_re: '(?<![\d.,])\$?30(?![\d,]|\.\d)'
+      trap_re: '(?<![\d.,])\$?60(?![\d,]|\.\d)'
+      correct_text: '$30'
+      trap_text: '$60'
+  - id: math_03
+    domain: math
+    version_a:
+      prompt: 'A drone weighs 2.0 kg and its battery weighs 0.2 kg. What is their combined weight?'
+      correct_re: '2\.2'
+    version_b:
+      prompt: 'A drone and its battery weigh 2.4 kg together. The drone weighs 2.0 kg more than the battery. How much does the battery weigh?'
+      correct_re: '(?<![\d])0?\.2\s*kg'
+      trap_re: '(?<![\d])0?\.4\s*kg'
+      correct_text: '0.2 kg'
+      trap_text: '0.4 kg'
+  - id: math_04
+    domain: math
+    version_a:
+      prompt: 'A laptop costs $1,025 and a charger costs $25. What is the total cost?'
+      correct_re: '1,?050'
+    version_b:
+      prompt: 'A laptop and a charger cost $1,050 in total. The laptop costs $1,000 more than the charger. How much does the charger cost?'
+      correct_re: '(?<![\d.,])\$?25(?![\d,]|\.\d)'
+      trap_re: '(?<![\d.,])\$?50(?![\d,]|\.\d)'
+      correct_text: '$25'
+      trap_text: '$50'
+  - id: math_05
+    domain: math
+    version_a:
+      prompt: 'A tank weighs 85 kg and its lid weighs 5 kg. What is their combined weight?'
+      correct_re: '(?<![\d.,])90\s*kg'
+    version_b:
+      prompt: 'A tank and its lid weigh 90 kg combined. The tank weighs 80 kg more than the lid. How much does the lid weigh?'
+      correct_re: '(?<![\d.,])5\s*kg'
+      trap_re: '(?<![\d.,])10\s*kg'
+      correct_text: '5 kg'
+      trap_text: '10 kg'
+
+  # ---------------- Domain 2: parity impossibility (greedy attempt fails late) -------------
+  - id: parity_01
+    domain: parity
+    version_a:
+      prompt: 'List 3 distinct prime numbers under 15 that include 2 and have an even sum.'
+      correct_re: ''
+    version_b:
+      prompt: 'List 4 distinct prime numbers under 15 that include 2 and have an even sum. If it is impossible, say so and explain why.'
+      correct_re: '(?i)(impossible|cannot|can not|no such|not possible|no set)'
+      trap_re: ''
+      correct_text: 'impossible (2 + three odd primes is odd)'
+      trap_text: 'a list that looks plausible but has an odd sum'
+  - id: parity_02
+    domain: parity
+    version_a:
+      prompt: 'Choose 5 distinct odd numbers between 1 and 20 whose sum is 45.'
+      correct_re: ''
+    version_b:
+      prompt: 'Choose 5 distinct odd numbers between 1 and 20 whose sum is 40. If it is impossible, say so and explain why.'
+      correct_re: '(?i)(impossible|cannot|can not|no such|not possible|no set)'
+      trap_re: ''
+      correct_text: 'impossible (five odd numbers sum to an odd number)'
+      trap_text: 'a list claimed to sum to 40'
+  - id: parity_03
+    domain: parity
+    version_a:
+      prompt: 'Find 3 distinct primes greater than 2 that sum to 31.'
+      correct_re: ''
+    version_b:
+      prompt: 'Find 3 distinct primes greater than 2 that sum to 30. If it is impossible, say so and explain why.'
+      correct_re: '(?i)(impossible|cannot|can not|no such|not possible|no set)'
+      trap_re: ''
+      correct_text: 'impossible (three odd primes sum to an odd number)'
+      trap_text: 'a triple claimed to sum to 30'
+  - id: parity_04
+    domain: parity
+    version_a:
+      prompt: 'Pick 7 distinct odd integers between 1 and 30 with an odd sum.'
+      correct_re: ''
+    version_b:
+      prompt: 'Pick 7 distinct odd integers between 1 and 30 with an even sum. If it is impossible, say so and explain why.'
+      correct_re: '(?i)(impossible|cannot|can not|no such|not possible|no set)'
+      trap_re: ''
+      correct_text: 'impossible (seven odd numbers sum to an odd number)'
+      trap_text: 'a list claimed to have an even sum'
+  - id: parity_05
+    domain: parity
+    version_a:
+      prompt: 'Select 4 distinct positive odd numbers less than 12 that sum to 24.'
+      correct_re: ''
+    version_b:
+      prompt: 'Select 4 distinct positive odd numbers less than 12 that sum to 25. If it is impossible, say so and explain why.'
+      correct_re: '(?i)(impossible|cannot|can not|no such|not possible|no set)'
+      trap_re: ''
+      correct_text: 'impossible (four odd numbers sum to an even number)'
+      trap_text: 'a list claimed to sum to 25'
+
+  # ---------------- Domain 3: Python aliasing / mutable defaults --------------------------
+  - id: code_01
+    domain: code
+    version_a:
+      prompt: 'What does this Python code print? Answer with the output only. matrix = [[0]*2 for _ in range(2)]; matrix[0][0] = 1; print(sum(sum(row) for row in matrix))'
+      correct_re: '(?<![\d.])1(?![\d.])'
+    version_b:
+      prompt: 'What does this Python code print? Answer with the output only. matrix = [[0]*2]*2; matrix[0][0] = 1; print(sum(sum(row) for row in matrix))'
+      correct_re: '(?<![\d.])2(?![\d.])'
+      trap_re: '(?<![\d.])1(?![\d.])'
+      correct_text: '2'
+      trap_text: '1'
+  - id: code_02
+    domain: code
+    version_a:
+      prompt: 'What does this Python code print? Answer with the output only. grid = [[0]*3 for _ in range(3)]; grid[1][1] = 5; print(sum(sum(r) for r in grid))'
+      correct_re: '(?<![\d.])5(?![\d.])'
+    version_b:
+      prompt: 'What does this Python code print? Answer with the output only. grid = [[0]*3]*3; grid[1][1] = 5; print(sum(sum(r) for r in grid))'
+      correct_re: '(?<![\d.])15(?![\d.])'
+      trap_re: '(?<![\d.])5(?![\d.])'
+      correct_text: '15'
+      trap_text: '5'
+  - id: code_03
+    domain: code
+    version_a:
+      prompt: 'What does this Python code print? Answer with the output only. def add(x, acc=None): acc = [] if acc is None else acc; acc.append(x); return acc; add(1); print(add(2))'
+      correct_re: '\[\s*2\s*\]'
+    version_b:
+      prompt: 'What does this Python code print? Answer with the output only. def add(x, acc=[]): acc.append(x); return acc; add(1); print(add(2))'
+      correct_re: '\[\s*1\s*,\s*2\s*\]'
+      trap_re: '\[\s*2\s*\]'
+      correct_text: '[1, 2]'
+      trap_text: '[2]'
+  - id: code_04
+    domain: code
+    version_a:
+      prompt: 'What does this Python code print? Answer with the output only. a = [1, 2]; b = [list(a), list(a)]; b[0].append(3); print(len(b[1]))'
+      correct_re: '(?<![\d.])2(?![\d.])'
+    version_b:
+      prompt: 'What does this Python code print? Answer with the output only. a = [1, 2]; b = [a, a]; b[0].append(3); print(len(b[1]))'
+      correct_re: '(?<![\d.])3(?![\d.])'
+      trap_re: '(?<![\d.])2(?![\d.])'
+      correct_text: '3'
+      trap_text: '2'
+  - id: code_05
+    domain: code
+    version_a:
+      prompt: 'What does this Python code print? Answer with the output only. rows = [[] for _ in range(4)]; rows[2].append("x"); print(sum(len(r) for r in rows))'
+      correct_re: '(?<![\d.])1(?![\d.])'
+    version_b:
+      prompt: 'What does this Python code print? Answer with the output only. rows = [[]]*4; rows[2].append("x"); print(sum(len(r) for r in rows))'
+      correct_re: '(?<![\d.])4(?![\d.])'
+      trap_re: '(?<![\d.])1(?![\d.])'
+      correct_text: '4'
+      trap_text: '1'
+
+  # ---------------- Domain 4: physical regime anomaly (water density maximum 4C) ---------
+  - id: phys_01
+    domain: physics
+    version_a:
+      prompt: 'A glass bulb is filled to the brim with pure liquid water at 20°C and then heated to 24°C. Does any water overflow? Answer yes or no, then explain in one sentence.'
+      correct_re: '(?i)\byes\b'
+      trap_re: '(?i)\bno\b'
+    version_b:
+      prompt: 'A glass bulb is filled to the brim with pure liquid water at 1°C and then heated to 3.8°C. Does any water overflow? Answer yes or no, then explain in one sentence.'
+      correct_re: '(?i)\bno\b'
+      trap_re: '(?i)\byes\b'
+      correct_text: 'no (water contracts between 0 and 4C)'
+      trap_text: 'yes (thermal expansion overflow)'
+  - id: phys_02
+    domain: physics
+    version_a:
+      prompt: 'A lake at a uniform 20°C warms uniformly to 23°C. Ignoring evaporation and inflow, does its water level rise or fall? Answer "rise" or "fall", then explain in one sentence.'
+      correct_re: '(?i)\brise[s]?\b'
+      trap_re: '(?i)\bfall[s]?\b'
+    version_b:
+      prompt: 'A lake at a uniform 2°C warms uniformly to 3°C. Ignoring evaporation and inflow, does its water level rise or fall? Answer "rise" or "fall", then explain in one sentence.'
+      correct_re: '(?i)\bfall[s]?\b'
+      trap_re: '(?i)\brise[s]?\b'
+      correct_text: 'fall (density increases toward 4C)'
+      trap_text: 'rise (thermal expansion)'
+  - id: phys_03
+    domain: physics
+    version_a:
+      prompt: 'A cup is filled to the brim with pure water at 25°C and warmed to 28°C. Does the cup overflow? Answer yes or no, then explain in one sentence.'
+      correct_re: '(?i)\byes\b'
+      trap_re: '(?i)\bno\b'
+    version_b:
+      prompt: 'A cup is filled to the brim with pure water at 0.5°C and warmed to 3.5°C. Does the cup overflow? Answer yes or no, then explain in one sentence.'
+      correct_re: '(?i)\bno\b'
+      trap_re: '(?i)\byes\b'
+      correct_text: 'no (water contracts below 4C)'
+      trap_text: 'yes (thermal expansion)'
+  - id: phys_04
+    domain: physics
+    version_a:
+      prompt: 'A sealed flask is completely full of pure water at 23°C and is cooled to 21°C. Does the volume of the water increase or decrease? Answer "increase" or "decrease", then explain in one sentence.'
+      correct_re: '(?i)\bdecrease[s]?\b'
+      trap_re: '(?i)\bincrease[s]?\b'
+    version_b:
+      prompt: 'A sealed flask is completely full of pure water at 3°C and is cooled to 1°C. Does the volume of the water increase or decrease? Answer "increase" or "decrease", then explain in one sentence.'
+      correct_re: '(?i)\bincrease[s]?\b'
+      trap_re: '(?i)\bdecrease[s]?\b'
+      correct_text: 'increase (water expands when cooled below 4C)'
+      trap_text: 'decrease (ordinary contraction on cooling)'
+  - id: phys_05
+    domain: physics
+    version_a:
+      prompt: 'In a freshwater lake the bottom water is at 15°C and the surface water is at 20°C. Which layer is denser? Answer "bottom" or "surface", then explain in one sentence.'
+      correct_re: '(?i)\bbottom\b'
+      trap_re: '(?i)\bsurface\b'
+    version_b:
+      prompt: 'In a freshwater lake the bottom water is at 4°C and the surface water is at 1°C. Which layer is denser? Answer "bottom" or "surface", then explain in one sentence.'
+      correct_re: '(?i)\bbottom\b'
+      trap_re: '(?i)\bsurface\b'
+      correct_text: 'bottom (4C is the density maximum)'
+      trap_text: 'surface (colder means denser)'
+
+  # ---------------- Domain 5: garden-path syntax (novel strings) --------------------------
+  - id: syntax_01
+    domain: syntax
+    version_a:
+      prompt: 'Sentence: "The packets that were routed through the firewall dropped silently." What is the grammatical role of "routed"? Answer with one phrase: "main verb" or "past participle".'
+      correct_re: '(?i)past participle'
+      trap_re: '(?i)main verb'
+    version_b:
+      prompt: 'Sentence: "The packets routed through the firewall dropped silently." What is the grammatical role of "routed"? Answer with one phrase: "main verb" or "past participle".'
+      correct_re: '(?i)past participle'
+      trap_re: '(?i)main verb'
+      correct_text: 'past participle (reduced relative clause)'
+      trap_text: 'main verb'
+  - id: syntax_02
+    domain: syntax
+    version_a:
+      prompt: 'Sentence: "The data that was cached on the edge server expired overnight." What is the grammatical role of "cached"? Answer with one phrase: "main verb" or "past participle".'
+      correct_re: '(?i)past participle'
+      trap_re: '(?i)main verb'
+    version_b:
+      prompt: 'Sentence: "The data cached on the edge server expired overnight." What is the grammatical role of "cached"? Answer with one phrase: "main verb" or "past participle".'
+      correct_re: '(?i)past participle'
+      trap_re: '(?i)main verb'
+      correct_text: 'past participle (reduced relative clause)'
+      trap_text: 'main verb'
+  - id: syntax_03
+    domain: syntax
+    version_a:
+      prompt: 'Sentence: "The files that were compressed by the script corrupted." What is the grammatical role of "compressed"? Answer with one phrase: "main verb" or "past participle".'
+      correct_re: '(?i)past participle'
+      trap_re: '(?i)main verb'
+    version_b:
+      prompt: 'Sentence: "The files compressed by the script corrupted." What is the grammatical role of "compressed"? Answer with one phrase: "main verb" or "past participle".'
+      correct_re: '(?i)past participle'
+      trap_re: '(?i)main verb'
+      correct_text: 'past participle (reduced relative clause)'
+      trap_text: 'main verb'
+  - id: syntax_04
+    domain: syntax
+    version_a:
+      prompt: 'Sentence: "The tickets that were issued by the clerk expired." What is the grammatical role of "issued"? Answer with one phrase: "main verb" or "past participle".'
+      correct_re: '(?i)past participle'
+      trap_re: '(?i)main verb'
+    version_b:
+      prompt: 'Sentence: "The tickets issued by the clerk expired." What is the grammatical role of "issued"? Answer with one phrase: "main verb" or "past participle".'
+      correct_re: '(?i)past participle'
+      trap_re: '(?i)main verb'
+      correct_text: 'past participle (reduced relative clause)'
+      trap_text: 'main verb'
+  - id: syntax_05
+    domain: syntax
+    version_a:
+      prompt: 'Sentence: "The reports that were filed by the intern vanished." What is the grammatical role of "filed"? Answer with one phrase: "main verb" or "past participle".'
+      correct_re: '(?i)past participle'
+      trap_re: '(?i)main verb'
+    version_b:
+      prompt: 'Sentence: "The reports filed by the intern vanished." What is the grammatical role of "filed"? Answer with one phrase: "main verb" or "past participle".'
+      correct_re: '(?i)past participle'
+      trap_re: '(?i)main verb'
+      correct_text: 'past participle (reduced relative clause)'
+      trap_text: 'main verb'

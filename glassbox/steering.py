@@ -44,8 +44,23 @@ class SteeringVector:
     mode: str = "all"  # "all", "decode", "prefill"
     norm_preserve: bool = False
     positions: list[int] | None = None
+    # Pulsed steering for autoregressive generation. When ``pulse_steps`` is set the
+    # vector is applied for only that many consecutive decode steps (never during
+    # prefill) once the pulse is triggered, then disarms. Trigger either at a fixed
+    # decode step (``pulse_start_step``, 1-indexed, counted per generation) or from
+    # outside via :meth:`SteeringController.fire_pulse` (e.g. a LogitsProcessor that
+    # watches generated text).
+    pulse_steps: int | None = None
+    pulse_start_step: int | None = None
 
     def __post_init__(self) -> None:
+        if self.pulse_steps is not None and self.pulse_steps < 1:
+            raise ValueError(f"E02: pulse_steps must be >= 1 (got {self.pulse_steps})")
+        if self.pulse_start_step is not None:
+            if self.pulse_steps is None:
+                raise ValueError("E02: pulse_start_step requires pulse_steps")
+            if self.pulse_start_step < 1:
+                raise ValueError(f"E02: pulse_start_step must be >= 1 (got {self.pulse_start_step})")
         if self.layer < 1:
             raise ValueError(f"E02: layer index must be >= 1 (got {self.layer})")
         if self.component not in ("residual", "mlp", "attn"):
@@ -64,7 +79,9 @@ class AblationTarget:
     mode: str = "zero"  # "zero", "clamp_max", "clamp_min", "clamp", "mean", "orthogonal"
     clamp_min: float | None = None
     clamp_max: float | None = None
-    mean_value: float = 0.0
+    # Scalar, or a per-head / per-feature mean vector (torch.Tensor, np.ndarray, list[float]).
+    # For attention heads (A-LL-HH) pass a [head_dim] vector for true mean-ablation.
+    mean_value: Any = 0.0
     direction: Any = None  # torch.Tensor, np.ndarray, or list[float] for orthogonal mode
     token_mode: str = "all"  # "all", "decode", "prefill"
     positions: list[int] | None = None
@@ -105,6 +122,7 @@ class SteeringController:
             "hooks_installed": 0,
         }
         self._parent_heads: dict[str, int] = {}
+        self._pulse_state: dict[int, dict[str, int]] = {}
 
         if steer is not None:
             if isinstance(steer, SteeringVector):
@@ -132,6 +150,8 @@ class SteeringController:
         mode: str = "all",
         norm_preserve: bool = False,
         positions: list[int] | None = None,
+        pulse_steps: int | None = None,
+        pulse_start_step: int | None = None,
     ) -> SteeringController:
         """Add a real-time steering vector intervention."""
         sv = SteeringVector(
@@ -142,6 +162,8 @@ class SteeringController:
             mode=mode,
             norm_preserve=norm_preserve,
             positions=positions,
+            pulse_steps=pulse_steps,
+            pulse_start_step=pulse_start_step,
         )
         self.steering_vectors.append(sv)
         if self._attached and self.model is not None:
@@ -149,13 +171,33 @@ class SteeringController:
             self.attach(self.model)
         return self
 
+    def fire_pulse(self, steps: int | None = None) -> int:
+        """Arm every pulsed steering vector for its next decode step(s).
+
+        Call this from outside the forward pass (e.g. a ``LogitsProcessor`` that sees
+        the generated text) at the moment the pulse should begin. Returns the number
+        of pulsed vectors armed.
+        """
+        armed = 0
+        for sv in self.steering_vectors:
+            if sv.pulse_steps is None:
+                continue
+            st = self._pulse_state.setdefault(id(sv), {"decode_calls": 0, "remaining": 0})
+            st["remaining"] = int(steps if steps is not None else sv.pulse_steps)
+            armed += 1
+        return armed
+
+    def reset_pulses(self) -> None:
+        """Disarm all pulses and reset per-generation decode counters."""
+        self._pulse_state.clear()
+
     def add_ablation(
         self,
         target: str,
         mode: str = "zero",
         clamp_min: float | None = None,
         clamp_max: float | None = None,
-        mean_value: float = 0.0,
+        mean_value: Any = 0.0,
         direction: Any = None,
         token_mode: str = "all",
         positions: list[int] | None = None,
@@ -182,6 +224,7 @@ class SteeringController:
         self.detach()
         self.steering_vectors.clear()
         self.ablation_targets.clear()
+        self._pulse_state.clear()
         self._stats = {
             "invocations": 0,
             "tokens_steered": 0,
@@ -291,6 +334,7 @@ class SteeringController:
         """Attach steering and ablation hooks to the model."""
         if self._attached:
             return self
+        self.reset_pulses()
         target_model = model or self.model
         if target_model is None:
             raise ValueError("E02: SteeringController.attach() requires a model")
@@ -371,6 +415,22 @@ class SteeringController:
 
         seq_len = hidden.shape[-2] if hidden.ndim >= 2 else 1
         for sv in steers:
+            # Pulsed steering: decode-only, fires for N steps, then disarms.
+            if sv.pulse_steps is not None:
+                st = self._pulse_state.setdefault(id(sv), {"decode_calls": 0, "remaining": 0})
+                if seq_len > 1:
+                    # New prefill == new generation: reset counters, disarm.
+                    st["decode_calls"] = 0
+                    st["remaining"] = 0
+                    continue
+                st["decode_calls"] += 1
+                if sv.pulse_start_step is not None and st["decode_calls"] == sv.pulse_start_step:
+                    st["remaining"] = sv.pulse_steps
+                if st["remaining"] <= 0:
+                    continue
+                st["remaining"] -= 1
+                self._stats["pulses_applied"] = self._stats.get("pulses_applied", 0) + 1
+
             # Token mode filter
             if sv.mode == "decode" and seq_len > 1:
                 continue
@@ -463,7 +523,9 @@ class SteeringController:
                             tensor[..., h_start:h_end], at.clamp_min
                         )
                     elif at.mode == "mean":
-                        tensor[..., h_start:h_end] = at.mean_value
+                        tensor[..., h_start:h_end] = self._mean_like(
+                            at.mean_value, tensor[..., h_start:h_end]
+                        )
                     self._stats["tokens_ablated"] += seq_len
                     continue
 
@@ -480,10 +542,21 @@ class SteeringController:
                         tensor[..., local_idx], min=at.clamp_min, max=at.clamp_max
                     )
                 elif at.mode == "mean":
-                    tensor[..., local_idx] = at.mean_value
+                    tensor[..., local_idx] = self._mean_like(at.mean_value, tensor[..., local_idx])
                 self._stats["tokens_ablated"] += seq_len
 
         return tensor
+
+    @staticmethod
+    def _mean_like(mean_value: Any, like: Any) -> Any:
+        """Coerce a scalar or per-feature mean (tensor/ndarray/list) to ``like``'s device/dtype."""
+        import torch
+
+        if _is_torch_tensor(mean_value):
+            return mean_value.to(device=like.device, dtype=like.dtype)
+        if isinstance(mean_value, (int, float)):
+            return mean_value
+        return torch.as_tensor(mean_value, dtype=like.dtype, device=like.device)
 
     def _build_intervention_hook(
         self,
@@ -536,6 +609,8 @@ def steer(
     mode: str = "all",
     norm_preserve: bool = False,
     positions: list[int] | None = None,
+    pulse_steps: int | None = None,
+    pulse_start_step: int | None = None,
 ) -> SteeringVector:
     """Convenience factory for a :class:`SteeringVector`."""
     return SteeringVector(
@@ -546,6 +621,8 @@ def steer(
         mode=mode,
         norm_preserve=norm_preserve,
         positions=positions,
+        pulse_steps=pulse_steps,
+        pulse_start_step=pulse_start_step,
     )
 
 
@@ -554,7 +631,7 @@ def ablate(
     mode: str = "zero",
     clamp_min: float | None = None,
     clamp_max: float | None = None,
-    mean_value: float = 0.0,
+    mean_value: Any = 0.0,
     direction: Any = None,
     token_mode: str = "all",
     positions: list[int] | None = None,

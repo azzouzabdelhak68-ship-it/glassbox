@@ -276,3 +276,117 @@ def test_unified_watch_and_steer(tmp_path: Any) -> None:
     # After context exit, steering is cleanly detached
     assert st._attached is False
     assert gb.steering is None
+
+
+# ---------------------------------------------------------------------------
+# v2.1 additions: per-head mean-ablation vectors and pulsed steering
+# ---------------------------------------------------------------------------
+
+
+def test_head_mean_ablation_with_vector() -> None:
+    """mode='mean' accepts a [head_dim] vector and writes it into the head's slice."""
+    model = DummyTransformer(num_layers=1, hidden_dim=8, num_heads=2)  # head_dim = 4
+    x = torch.ones(1, 2, 8)
+    mean_vec = torch.tensor([1.0, 2.0, 3.0, 4.0])
+
+    controller = SteeringController(model)
+    controller.add_ablation("A-01-01", mode="mean", mean_value=mean_vec)
+
+    captured: dict[str, torch.Tensor] = {}
+    with controller:
+        # Registered AFTER the steering hook so it observes the already-ablated input.
+        h = model.layers[0].self_attn.o_proj.register_forward_pre_hook(
+            lambda _m, inputs: captured.setdefault("o_proj_in", inputs[0].clone())
+        )
+        try:
+            model(x)
+        finally:
+            h.remove()
+
+    o_in = captured["o_proj_in"]
+    assert torch.allclose(o_in[0, 0, :4], mean_vec)  # head 1 replaced by mean vector
+    assert torch.allclose(o_in[0, 1, :4], mean_vec)  # every position
+    assert torch.allclose(o_in[0, :, 4:], torch.ones(2, 4))  # head 2 untouched
+
+
+def test_head_mean_ablation_scalar_still_works() -> None:
+    model = DummyTransformer(num_layers=1, hidden_dim=8, num_heads=2)
+    x = torch.ones(1, 2, 8)
+    controller = SteeringController(model)
+    controller.add_ablation("A-01-02", mode="mean", mean_value=0.25)
+
+    captured: dict[str, torch.Tensor] = {}
+    with controller:
+        h = model.layers[0].self_attn.o_proj.register_forward_pre_hook(
+            lambda _m, inputs: captured.setdefault("o_proj_in", inputs[0].clone())
+        )
+        try:
+            model(x)
+        finally:
+            h.remove()
+    assert torch.allclose(captured["o_proj_in"][0, :, 4:], torch.full((2, 4), 0.25))
+
+
+def test_pulse_validation() -> None:
+    with pytest.raises(ValueError, match="pulse_steps must be >= 1"):
+        SteeringVector(layer=1, vector=[1.0], pulse_steps=0)
+    with pytest.raises(ValueError, match="pulse_start_step requires pulse_steps"):
+        SteeringVector(layer=1, vector=[1.0], pulse_start_step=3)
+    with pytest.raises(ValueError, match="pulse_start_step must be >= 1"):
+        SteeringVector(layer=1, vector=[1.0], pulse_steps=2, pulse_start_step=0)
+    sv = steer(layer=1, vector=[1.0], pulse_steps=2, pulse_start_step=4)
+    assert sv.pulse_steps == 2 and sv.pulse_start_step == 4
+
+
+def test_pulse_fixed_start_step_fires_exactly_n_decode_steps() -> None:
+    model = DummyTransformer(num_layers=1, hidden_dim=4)
+    controller = SteeringController(model)
+    controller.add_steering(
+        layer=1, vector=torch.ones(4), scale=1.0, pulse_steps=2, pulse_start_step=2
+    )
+    with controller:
+        model(torch.ones(1, 5, 4))  # prefill: never steered
+        assert controller.stats["tokens_steered"] == 0
+        applied_per_step = []
+        for _ in range(5):  # 5 decode steps
+            before = controller.stats["tokens_steered"]
+            model(torch.ones(1, 1, 4))
+            applied_per_step.append(controller.stats["tokens_steered"] - before)
+    # decode step 1: idle, steps 2-3: pulse, steps 4-5: disarmed
+    assert applied_per_step == [0, 1, 1, 0, 0]
+    assert controller.stats["pulses_applied"] == 2
+
+
+def test_pulse_external_fire_and_prefill_reset() -> None:
+    model = DummyTransformer(num_layers=1, hidden_dim=4)
+    controller = SteeringController(model)
+    controller.add_steering(layer=1, vector=torch.ones(4), scale=1.0, pulse_steps=3)
+    with controller:
+        model(torch.ones(1, 4, 4))  # prefill
+        model(torch.ones(1, 1, 4))  # decode 1: not armed
+        model(torch.ones(1, 1, 4))  # decode 2: not armed
+        assert controller.stats["tokens_steered"] == 0
+
+        assert controller.fire_pulse() == 1  # e.g. LogitsProcessor saw the trigger text
+        for _ in range(5):
+            model(torch.ones(1, 1, 4))
+        assert controller.stats["tokens_steered"] == 3  # exactly pulse_steps, then disarmed
+
+        # A new prefill is a new generation: arm state is cleared.
+        controller.fire_pulse()
+        model(torch.ones(1, 4, 4))
+        before = controller.stats["tokens_steered"]
+        model(torch.ones(1, 1, 4))
+        assert controller.stats["tokens_steered"] == before
+
+
+def test_non_pulsed_steering_unchanged() -> None:
+    """Vectors without pulse_steps keep the original always-on behaviour."""
+    model = DummyTransformer(num_layers=1, hidden_dim=4)
+    controller = SteeringController(model)
+    controller.add_steering(layer=1, vector=torch.ones(4), scale=1.0, mode="decode")
+    with controller:
+        for _ in range(3):
+            model(torch.ones(1, 1, 4))
+    assert controller.stats["tokens_steered"] == 3
+    assert controller.fire_pulse() == 0
