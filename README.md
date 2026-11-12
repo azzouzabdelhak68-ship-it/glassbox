@@ -8,7 +8,7 @@
   \____|_|\__,_|___/___/         |____/ \___/_/\_\ 
 ```
 
-### Zero-Overhead Flight Recorder & Mechanistic Interpretability Engine for PyTorch LLMs
+###
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](pyproject.toml)
 [![PyTorch 2.4+](https://img.shields.io/badge/pytorch-2.4%2B-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org)
