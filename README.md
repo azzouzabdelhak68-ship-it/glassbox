@@ -85,7 +85,7 @@ In a stress test on an **NVIDIA A100-SXM4-80GB**, GlassBox recorded **893 tokens
 
 ---
 
-## 🚀 GlassBox 2.0: Fast Distributed Serving & Multi-GPU Sharding
+##  GlassBox 2.0: Fast Distributed Serving & Multi-GPU Sharding
 
 GlassBox 2.0 expands from a single-GPU research instrument into a high-throughput, distributed mechanistic interpretability platform engineered for production continuous-batching engines (**vLLM V1** and **SGLang SRT**) across multi-GPU nodes with Tensor Parallelism (TP).
 
@@ -185,14 +185,14 @@ flowchart TD
 
 ## Key Features
 
-- ⚡ **Zero-Stall Asynchronous Tap**: Captures activations on a dedicated CUDA `copyStream` without CPU synchronization barriers.
-- 🗜️ **Chunked Sparse Compression**: Transparent chunked compression (`zlib` / RLE) for zero-heavy activations, reducing disk footprint by 2× to 10× with random-access slice reads (`read_deep_slice`).
-- 🔭 **Logit Lens**: Project intermediate layer representations ($L_0 \dots L_N$) through the unembedding matrix to see token predictions form in real time across model depth.
-- 🎯 **Direct Logit Attribution (DLA)**: Quantify causal feature salience between prompt cohorts (`glassbox compare --attribute`).
-- 🧬 **Sparse Autoencoder (SAE) Latents**: Full first-class support for monosemantic feature addresses (`SAE-LL-FFFF` and `F-LL-FFFF`).
-- 🤖 **Automated Watchlist Profiler**: Automatically profiles models over sample prompts and exports tailored, high-variance watchlists.
-- 🔒 **Cryptographic Hash Sealing**: SHA-256 seal covering unified metadata and binary activations linked into an append-only provenance chain (`chain.jsonl`).
-- 🎨 **Calm Viewer**: Self-contained static HTML reports with inline SVG activation heatmap matrices and co-occurrence circuit graphs (zero npm, zero React, zero CDN).
+-  **Zero-Stall Asynchronous Tap**: Captures activations on a dedicated CUDA `copyStream` without CPU synchronization barriers.
+- **Chunked Sparse Compression**: Transparent chunked compression (`zlib` / RLE) for zero-heavy activations, reducing disk footprint by 2× to 10× with random-access slice reads (`read_deep_slice`).
+- **Logit Lens**: Project intermediate layer representations ($L_0 \dots L_N$) through the unembedding matrix to see token predictions form in real time across model depth.
+-  **Direct Logit Attribution (DLA)**: Quantify causal feature salience between prompt cohorts (`glassbox compare --attribute`).
+-  **Sparse Autoencoder (SAE) Latents**: Full first-class support for monosemantic feature addresses (`SAE-LL-FFFF` and `F-LL-FFFF`).
+-  **Automated Watchlist Profiler**: Automatically profiles models over sample prompts and exports tailored, high-variance watchlists.
+- **Cryptographic Hash Sealing**: SHA-256 seal covering unified metadata and binary activations linked into an append-only provenance chain (`chain.jsonl`).
+- **Calm Viewer**: Self-contained static HTML reports with inline SVG activation heatmap matrices and co-occurrence circuit graphs (zero npm, zero React, zero CDN).
 
 ---
 
@@ -207,7 +207,7 @@ Don't want to install anything locally or mess with environments? You can test G
 - **Inspect what the model thinks:** See layer-by-layer token predictions (Logit Lens) and which neurons fire on your prompt.
 - **Visual report:** Opens the interactive HTML viewer right inside the notebook.
 
-> 💡 **Why Scale Matters:** At micro-scale (0.5B at batch=1), GPU forward passes take `<3ms`, so Python hook dispatch dominates. GlassBox's sub-1% asynchronous DMA advantage shines at production scale ($B \ge 4$ or models $\ge 3\text{B}$) where activation payloads reach tens of megabytes and synchronous `.cpu()` stalls the CUDA pipeline.
+>  **Why Scale Matters:** At micro-scale (0.5B at batch=1), GPU forward passes take `<3ms`, so Python hook dispatch dominates. GlassBox's sub-1% asynchronous DMA advantage shines at production scale ($B \ge 4$ or models $\ge 3\text{B}$) where activation payloads reach tens of megabytes and synchronous `.cpu()` stalls the CUDA pipeline.
 
 Just click the badge above, hit **Run all**, and see it work.
 
